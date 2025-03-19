@@ -60,6 +60,7 @@ The application exposes the following REST APIs:
 
     * **Parameters:**
         * `headless` (optional, header): Whether to run Selenium in headless mode. Defaults to false.
+        * `count` (optional, request param): User can specify how many details it tobe fetched. Defaults value 5.
 
     * **Returns:** A list of business listings.
 
