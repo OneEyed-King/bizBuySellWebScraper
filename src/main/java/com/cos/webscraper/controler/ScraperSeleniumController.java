@@ -17,13 +17,13 @@ public class ScraperSeleniumController {
     /**
      * Retrieves seller details.
      *
-     * @param url      The URL to scrape.
+     *
      * @param headless Whether to run Selenium in headless mode. Defaults to false.
      * @return A list of business listings.
-     * @throws InterruptedException If the scraping process is interrupted.
+     *
      */
     @GetMapping("/get-seller-details")
-    public List<BusinessListing> getSelerDetails(@RequestParam String url, @RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+    public List<BusinessListing> getSelerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
 
         return seleniumService.scrape(Boolean.parseBoolean(headless));
     }
@@ -31,13 +31,13 @@ public class ScraperSeleniumController {
     /**
      * Retrieves all business listings.
      *
-     * @param url      The URL to scrape.
+     *
      * @param headless Whether to run Selenium in headless mode. Defaults to false.
      * @return A list of business listings.
-     * @throws InterruptedException If the scraping process is interrupted.
+     *
      */
     @GetMapping("/get-all-listings")
-    public List<BusinessListing> getAllListings(@RequestParam String url, @RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+    public List<BusinessListing> getAllListings(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
 
         return seleniumService.getWebListings(Boolean.parseBoolean(headless));
     }
