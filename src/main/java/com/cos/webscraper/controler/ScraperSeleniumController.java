@@ -3,6 +3,7 @@ package com.cos.webscraper.controler;
 import java.util.List;
 
 import com.cos.webscraper.model.BusinessListing;
+import com.cos.webscraper.service.ScraperSeleniumService;
 import com.cos.webscraper.serviceimpl.ScraperSeleniumServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 public class ScraperSeleniumController {
 
     @Autowired
-    private ScraperSeleniumServiceImpl seleniumService;
+    private ScraperSeleniumService seleniumService;
 
     /**
      * Retrieves seller details.
@@ -23,9 +24,9 @@ public class ScraperSeleniumController {
      *
      */
     @GetMapping("/get-seller-details")
-    public List<BusinessListing> getSelerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+    public List<BusinessListing> getSellerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless, @RequestParam(required = false, defaultValue = "5") String count) throws InterruptedException {
 
-        return seleniumService.scrape(Boolean.parseBoolean(headless));
+        return seleniumService.scrape(Boolean.parseBoolean(headless), count);
     }
 
     /**

@@ -48,10 +48,11 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     }
 
     @Override
-    public List<BusinessListing> scrape(boolean isHeadless) throws InterruptedException {
+    public List<BusinessListing> scrape(boolean isHeadless, String countStr) throws InterruptedException {
         initializeDriver(isHeadless);
         List<BusinessListing> businessListings = new ArrayList<>();
-
+        List<BusinessListing> fetchedListings = new ArrayList<>();
+        int count = Integer.parseInt(countStr); // Convert once
         try {
             driver.get(url + "/buy/");
 
@@ -68,6 +69,10 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 //                    count = 0;
 //                }
                 extractSellerDetails(listing);
+                fetchedListings.add(listing);
+                if(fetchedListings.size() >= count){
+                    break;
+                }
             }
 
         } catch (Exception e) {
@@ -76,7 +81,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
             driver.quit();
         }
 
-        return businessListings;
+        return fetchedListings;
     }
 
     @Override
@@ -99,67 +104,66 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     }
 
 
+    private List<BusinessListing> extractListingDetails(List<WebElement> listingElements) {
 
-private List<BusinessListing> extractListingDetails(List<WebElement> listingElements) {
+        List<BusinessListing> businessListings = new ArrayList<>();
 
-    List<BusinessListing> businessListings = new ArrayList<>();
+        for (WebElement listing : listingElements) {
+            try {
+                BusinessListing businessListing = new BusinessListing();
+                businessListing.setName(listing.getText());
 
-    for (WebElement listing : listingElements) {
+                String listingUrl = listing.getAttribute("href");
+                listingUrl = listingUrl.substring(0, listingUrl.length() - 1);
+                String listingId = listingUrl.substring(listingUrl.lastIndexOf("/") + 1).replaceAll("/", "");
+
+                businessListing.setUrl(listingUrl);
+                businessListing.setListingId(listingId);
+
+                String contactButtonId = "hlViewTelephone_" + listingId;
+                businessListing.setContactButtonId(contactButtonId);
+                businessListings.add(businessListing);
+            } catch (Exception e) {
+                System.err.println("Error processing listing: " + e.getMessage());
+            }
+        }
+
+        return businessListings;
+
+    }
+
+    private void extractSellerDetails(BusinessListing listing) {
         try {
-            BusinessListing businessListing = new BusinessListing();
-            businessListing.setName(listing.getText());
+            driver.get(listing.getUrl());
 
-            String listingUrl = listing.getAttribute("href");
-            listingUrl = listingUrl.substring(0, listingUrl.length() - 1);
-            String listingId = listingUrl.substring(listingUrl.lastIndexOf("/") + 1).replaceAll("/", "");
+            JavascriptExecutor js = (JavascriptExecutor) driver;
 
-            businessListing.setUrl(listingUrl);
-            businessListing.setListingId(listingId);
+            try {
+                WebElement contactButton = wait.until(ExpectedConditions.elementToBeClickable(By.id(listing.getContactButtonId())));
+                js.executeScript("arguments[0].click();", contactButton);
 
-            String contactButtonId = "hlViewTelephone_" + listingId;
-            businessListing.setContactButtonId(contactButtonId);
-            businessListings.add(businessListing);
+                wait.until(ExpectedConditions.stalenessOf(contactButton));
+
+                WebElement phoneElement = wait.until(ExpectedConditions.presenceOfElementLocated(
+                        By.id("lblViewTpnTelephone_" + listing.getListingId())));
+
+                listing.setSellerContact(phoneElement.getText());
+            } catch (TimeoutException te) {
+                System.err.println("Timeout waiting for contact details for: " + listing.getName());
+            }
+
+
+            try {
+                WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".seller-name")));
+                listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
+            } catch (TimeoutException te) {
+                System.err.println("Timeout waiting for seller name for: " + listing.getName());
+            }
+
+
+            System.out.println("Extracted contact for: " + gson.toJson(listing));
         } catch (Exception e) {
-            System.err.println("Error processing listing: " + e.getMessage());
+            System.err.println("Failed to extract contact for: " + listing.getName() + ": " + e.getMessage());
         }
     }
-
-    return businessListings;
-
-}
-
-private void extractSellerDetails(BusinessListing listing) {
-    try {
-        driver.get(listing.getUrl());
-
-        JavascriptExecutor js = (JavascriptExecutor) driver;
-
-        try {
-            WebElement contactButton = wait.until(ExpectedConditions.elementToBeClickable(By.id(listing.getContactButtonId())));
-            js.executeScript("arguments[0].click();", contactButton);
-
-            wait.until(ExpectedConditions.stalenessOf(contactButton));
-
-            WebElement phoneElement = wait.until(ExpectedConditions.presenceOfElementLocated(
-                    By.id("lblViewTpnTelephone_" + listing.getListingId())));
-
-            listing.setSellerContact(phoneElement.getText());
-        } catch (TimeoutException te) {
-            System.err.println("Timeout waiting for contact details for: " + listing.getName());
-        }
-
-
-        try {
-            WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".seller-name")));
-            listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
-        } catch (TimeoutException te) {
-            System.err.println("Timeout waiting for seller name for: " + listing.getName());
-        }
-
-
-        System.out.println("Extracted contact for: " + gson.toJson(listing));
-    } catch (Exception e) {
-        System.err.println("Failed to extract contact for: " + listing.getName() + ": " + e.getMessage());
-    }
-}
 }
