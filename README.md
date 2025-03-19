@@ -58,7 +58,7 @@ The application exposes the following REST APIs:
 
     Retrieves seller details.
 
-    * **Parameters:**
+    * **Request Header:**
         * `headless` (optional, header): Whether to run Selenium in headless mode. Defaults to false.
 
     * **Returns:** A list of business listings.
@@ -68,7 +68,7 @@ The application exposes the following REST APIs:
 
     Retrieves all business listings.
 
-    * **Parameters:**
+    * **Request Header:**
         * `headless` (optional, header): Whether to run Selenium in headless mode. Defaults to false.
 
     * **Returns:** A list of business listings.
