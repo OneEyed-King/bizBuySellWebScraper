@@ -60,14 +60,9 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
             businessListings = extractListingDetails(listingElements);
 
 
-            System.out.println("Found " + businessListings.size() + " listings.");
+            log.info("Found {} listings.", businessListings.size());
 
             for (BusinessListing listing : businessListings) {
-//                if (count == 5) {
-//                    driver.quit();
-//                    initializeDriver(isHeadless);
-//                    count = 0;
-//                }
                 extractSellerDetails(listing);
                 fetchedListings.add(listing);
                 if(fetchedListings.size() >= count){
@@ -76,7 +71,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
             }
 
         } catch (Exception e) {
-            log.error("Unable to scrape web listing, reason :{} ", e.getMessage());
+            log.error("Unable to scrape web listing details, reason :{} ", e.getMessage());
         } finally {
             driver.quit();
         }
@@ -124,7 +119,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
                 businessListing.setContactButtonId(contactButtonId);
                 businessListings.add(businessListing);
             } catch (Exception e) {
-                System.err.println("Error processing listing: " + e.getMessage());
+                log.error("Error processing listing: {}", e.getMessage());
             }
         }
 
@@ -149,21 +144,21 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
                 listing.setSellerContact(phoneElement.getText());
             } catch (TimeoutException te) {
-                System.err.println("Timeout waiting for contact details for: " + listing.getName());
+                log.error("Timeout waiting for contact details for: {} reason: {}", listing.getName(), te.getMessage());
             }
 
 
             try {
-                WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".seller-name")));
+                WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("#contactSellerForm > div:nth-child(9) > div:nth-child(1) > div:nth-child(1)")));
                 listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
             } catch (TimeoutException te) {
-                System.err.println("Timeout waiting for seller name for: " + listing.getName());
+                log.error("Timeout waiting for seller name for: {} reason: {}", listing.getName(), te.getMessage());
             }
 
 
-            System.out.println("Extracted contact for: " + gson.toJson(listing));
+            log.info("Extracted contact for: {}", gson.toJson(listing));
         } catch (Exception e) {
-            System.err.println("Failed to extract contact for: " + listing.getName() + ": " + e.getMessage());
+            log.error("Failed to extract contact for: {} : {}", listing.getName(), e.getMessage());
         }
     }
 }
