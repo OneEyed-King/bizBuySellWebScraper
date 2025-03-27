@@ -15,6 +15,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.bidi.network.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private int count;
     private final String url = "https://www.bizbuysell.com/";
+    @Autowired private WebDriverFactory webDriverFactory;
 
 
     @Override
@@ -48,27 +50,48 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
 
     public List<BusinessListing> scrape(boolean isHeadless, String countStr, String skip) {
-        WebDriver driver = WebDriverFactory.getDriver(isHeadless);
+        WebDriver driver = webDriverFactory.getFireFoxDriver(isHeadless);
+//        WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
         List<BusinessListing> businessListings = new ArrayList<>();
         List<BusinessListing> fetchedListings = new ArrayList<>();
+        List<WebElement> listingElements = new ArrayList<>();
         int count = Integer.parseInt(countStr); // Convert once
+        int retry = 0;
         try {
-            driver.get(url + "/buy/");
 
-            JavascriptExecutor js = (JavascriptExecutor) driver;
-            Thread.sleep(3000); // Let elements load
-
-
-            List<WebElement> listingElements = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(By.cssSelector("a.diamond")));
-
+            while (retry < 8) {
+                try {
+                    driver.get(url + "/buy/");
+//                    driver.get("https://myexternalip.com/raw");
+                    JavascriptExecutor js = (JavascriptExecutor) driver;
+                    Thread.sleep(3000); // Let elements load
+                    listingElements = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(By.cssSelector("a.diamond")));
+                    break;
+                } catch (Exception e) {
+                    log.warn("retrying... count: {}", retry);
+                    driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
+                    wait = WebDriverFactory.getWait();
+                    retry++;
+                }
+            }
+            if (retry >= 8) {
+                log.error(" Max retries done returning");
+                throw new TimeoutException();
+            }
             businessListings = extractListingDetails(listingElements.subList(Integer.parseInt(skip), listingElements.size()));
 
-
             log.info("Found {} listings.", businessListings.size());
+            JavascriptExecutor js = (JavascriptExecutor) driver;
+
 
             for (BusinessListing listing : businessListings) {
-                extractSellerDetails(listing, driver, wait);
+
+                extractSellerDetails(listing, driver, wait, isHeadless);
+                if(listing.isBlocked()){
+                    driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
+                    wait = WebDriverFactory.getWait();
+                }
                 fetchedListings.add(listing);
                 if (fetchedListings.size() >= count || !businessListings.iterator().hasNext()) {
                     break;
@@ -77,9 +100,9 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
                 driver.navigate().refresh();
                 wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("body")));
             }
-
         } catch (Exception e) {
             log.error("Unable to scrape web listing details, reason :{} ", e.getMessage());
+            return fetchedListings;
         } finally {
             WebDriverFactory.quitDriver();
         }
@@ -89,7 +112,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
     @Override
     public List<BusinessListing> getWebListings(boolean isHeadless) {
-        WebDriver driver = WebDriverFactory.getDriver(isHeadless);
+        WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
         List<BusinessListing> businessListings = new ArrayList<>();
 
@@ -112,7 +135,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
     @Override
     public List<BusinessListing> getAllRegions(boolean isHeadless) {
-        WebDriver driver = WebDriverFactory.getDriver(isHeadless);
+        WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
         Network network = new Network(driver);
 
@@ -261,14 +284,67 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
     }
 
-    private void extractSellerDetails(BusinessListing listing, WebDriver driver, WebDriverWait wait) {
+    private void extractSellerDetails(BusinessListing listing, WebDriver driver, WebDriverWait wait, boolean isHeadless) {
+
+        int retryCount = 0;
+
         try {
+            Document doc = null;
+            while (retryCount < 4) {
+                try {
+                    driver.get(listing.getUrl());
+                    wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("body")));
+                    String pageSource = driver.getPageSource();
+                    doc = Jsoup.parse(pageSource);
+                    JavascriptExecutor js = (JavascriptExecutor) driver;
 
-            driver.get(listing.getUrl());
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("body")));
-            String pageSource = driver.getPageSource();
-            Document doc = Jsoup.parse(pageSource);
+                    try {
+                        WebElement contactButton = wait.until(ExpectedConditions.elementToBeClickable(By.id(listing.getContactButtonId())));
+                        js.executeScript("arguments[0].click();", contactButton);
 
+                        wait.until(ExpectedConditions.stalenessOf(contactButton));
+
+                        WebElement phoneElement = wait.until(ExpectedConditions.presenceOfElementLocated(
+                                By.id("lblViewTpnTelephone_" + listing.getListingId())));
+
+                        listing.setSellerContact(phoneElement.getText());
+                    } catch (TimeoutException te) {
+                        log.error("Timeout waiting for contact details for: {} reason: {}", listing.getName(), te.getMessage());
+
+                    }
+
+                    try {
+                        WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("#contactSellerForm > div:nth-child(9) > div:nth-child(1) > div:nth-child(1)")));
+                        listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
+                    } catch (TimeoutException te) {
+                        log.error("Timeout waiting for seller name for: {} reason: {}", listing.getName(), te.getMessage());
+                    }
+
+                    break;
+                } catch (Exception e) {
+                    log.warn("Blocked page detected for: {}, switching proxy.", listing.getName());
+                    log.warn("retry count: {} ", retryCount);
+//                    driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
+//                    wait = WebDriverFactory.getWait();
+                    listing.setBlocked(true);
+                    retryCount++;
+                }
+
+//                if (isBlocked(pageSource)) {
+//                    log.warn("Blocked page detected for: {}, switching proxy.", listing.getName());
+//                    driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
+//                    wait = WebDriverFactory.getWait();
+//                    retryCount++;
+//
+//                } else {
+//                    break;
+//                }
+            }
+
+            if (retryCount > 8) {
+                log.error(" Max retries done returning");
+                return;
+            }
 
             Element headingElement = doc.selectFirst("h1.bfsTitle"); // Adjusted to correct selector
             String listingTitle = headingElement != null ? headingElement.text().trim() : "N/A";
@@ -303,33 +379,48 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
                 detailedinfo.append(String.format("%s %s\n", detailKey, detailValue));
             }
             listing.setDetailedInfo(detailedinfo.toString());
-            JavascriptExecutor js = (JavascriptExecutor) driver;
+//            JavascriptExecutor js = (JavascriptExecutor) driver;
+//
+//            try {
+//                WebElement contactButton = wait.until(ExpectedConditions.elementToBeClickable(By.id(listing.getContactButtonId())));
+//                js.executeScript("arguments[0].click();", contactButton);
+//
+//                wait.until(ExpectedConditions.stalenessOf(contactButton));
+//
+//                WebElement phoneElement = wait.until(ExpectedConditions.presenceOfElementLocated(
+//                        By.id("lblViewTpnTelephone_" + listing.getListingId())));
+//
+//                listing.setSellerContact(phoneElement.getText());
+//            } catch (TimeoutException te) {
+//                log.error("Timeout waiting for contact details for: {} reason: {}", listing.getName(), te.getMessage());
+//            }
+//
+//            try {
+//                WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("#contactSellerForm > div:nth-child(9) > div:nth-child(1) > div:nth-child(1)")));
+//                listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
+//            } catch (TimeoutException te) {
+//                log.error("Timeout waiting for seller name for: {} reason: {}", listing.getName(), te.getMessage());
+//            }
 
-            try {
-                WebElement contactButton = wait.until(ExpectedConditions.elementToBeClickable(By.id(listing.getContactButtonId())));
-                js.executeScript("arguments[0].click();", contactButton);
-
-                wait.until(ExpectedConditions.stalenessOf(contactButton));
-
-                WebElement phoneElement = wait.until(ExpectedConditions.presenceOfElementLocated(
-                        By.id("lblViewTpnTelephone_" + listing.getListingId())));
-
-                listing.setSellerContact(phoneElement.getText());
-            } catch (TimeoutException te) {
-                log.error("Timeout waiting for contact details for: {} reason: {}", listing.getName(), te.getMessage());
-            }
-
-            try {
-                WebElement sellerName = wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("#contactSellerForm > div:nth-child(9) > div:nth-child(1) > div:nth-child(1)")));
-                listing.setSellerName(sellerName.getText().replace("Listed By:", "").trim());
-            } catch (TimeoutException te) {
-                log.error("Timeout waiting for seller name for: {} reason: {}", listing.getName(), te.getMessage());
-            }
-
-
+            listing.setBlocked(false);
             log.info("Extracted contact for: {}", gson.toJson(listing));
+
         } catch (Exception e) {
             log.error("Failed to extract contact for: {} : {}", listing.getName(), e.getMessage());
         }
+
     }
+
+    private WebDriver rotateProxy(boolean isHeadless) {
+
+        WebDriverFactory.quitDriver();
+        return webDriverFactory.getChromeDriver(isHeadless);
+
+    }
+
+    private boolean isBlocked(String pageSource) {
+        // Simple check for block page (can be extended to look for other block signs)
+        return pageSource.contains("captcha") || pageSource.contains("Access Denied") || pageSource.contains("403 Forbidden") || pageSource.contains("connection failed");
+    }
+
 }
