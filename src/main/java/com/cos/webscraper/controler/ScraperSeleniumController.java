@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.cos.webscraper.model.BusinessListing;
+import com.cos.webscraper.model.dto.Regions;
 import com.cos.webscraper.service.ScraperSeleniumService;
-import com.cos.webscraper.serviceimpl.ScraperSeleniumServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,7 +45,7 @@ public class ScraperSeleniumController {
     }
 
     @GetMapping("/get-all-regions")
-    public List<BusinessListing> getAllRegions(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+    public List<Regions> getAllRegions(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
 
         return seleniumService.getAllRegions(Boolean.parseBoolean(headless));
     }

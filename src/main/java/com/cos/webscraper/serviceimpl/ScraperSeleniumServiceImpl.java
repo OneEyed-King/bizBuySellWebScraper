@@ -1,7 +1,11 @@
 package com.cos.webscraper.serviceimpl;
 
 import com.cos.webscraper.config.WebDriverFactory;
+import com.cos.webscraper.model.dto.Regions;
+import com.cos.webscraper.model.dto.RegionsResponseDto;
 import com.cos.webscraper.service.ScraperSeleniumService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.cos.webscraper.model.BusinessListing;
@@ -12,23 +16,28 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
 
-import org.openqa.selenium.bidi.network.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.devtools.DevTools;
+import org.openqa.selenium.devtools.v134.network.Network;
+import org.openqa.selenium.devtools.v134.network.model.RequestId;
+import org.openqa.selenium.devtools.v134.network.model.Response;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.bidi.module.Network;
+//import org.openqa.selenium.bidi.module.Network;
 
 import java.lang.Thread;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -134,127 +143,62 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     }
 
     @Override
-    public List<BusinessListing> getAllRegions(boolean isHeadless) {
+    public List<Regions> getAllRegions(boolean isHeadless) {
         WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
-        Network network = new Network(driver);
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(300));
+        AtomicReference<List<Regions>> regions = new AtomicReference<>();
 
-        network.addIntercept(new AddInterceptParameters(InterceptPhase.BEFORE_REQUEST_SENT));
+        DevTools devTools = ((ChromeDriver) driver).getDevTools();
+        devTools.createSession();
 
-        CountDownLatch latch = new CountDownLatch(2);
+        // Enable network monitoring
+        devTools.send(Network.enable(Optional.empty(), Optional.empty(), Optional.empty()));
 
-//        network.onBeforeRequestSent(beforeRequestSent -> {
-//            String requestId = beforeRequestSent.getRequest().getRequestId();
-//            FetchTimingInfo timings = beforeRequestSent.getRequest().getTimings();
-//            String url = beforeRequestSent.getRequest().getUrl();
-//            String method = beforeRequestSent.getRequest().getMethod();
-//            List<Cookie> cookies = beforeRequestSent.getRequest().getCookies();
-//            List<Header> headers = beforeRequestSent.getRequest().getHeaders();
-//            Long headersSize = beforeRequestSent.getRequest().getHeadersSize();
-//
-//            if(url.contains("api/Resource/GetRegions")){
-//                System.out.printf("%nRequest method %s %n. "
-//                                + "Sent to URL %s %n. "
-//                                + "Timing info %s %n. "
-//                                + "Cookies %s %n. "
-//                                + "Headers %s %n. "
-//                                + "Headers size %s %n.",
-//                        method, url, timings.getRequestTime(), cookies, headers, headersSize);
-//            }
-//            network.continueRequest(new ContinueRequestParameters(requestId));
-//
-//            latch.countDown();
-//
-//        });
+        // Listen for network requests
+        devTools.addListener(Network.requestWillBeSent(), request -> {
+            if (request.getRequest().getUrl().contains("api/Resource/GetRegions")) {
+                log.info("➡ API request detected: {}", request.getRequest().getUrl());
+            }
+        });
 
-//        network.onBeforeRequestSent(beforeRequestSent -> {
-//            String requestId = beforeRequestSent.getRequest().getRequestId();
-//            FetchTimingInfo timings = beforeRequestSent.getRequest().getTimings();
-//            String url = beforeRequestSent.getRequest().getUrl();
-//            String method = beforeRequestSent.getRequest().getMethod();
-//            List<Cookie> cookies = beforeRequestSent.getRequest().getCookies();
-//            List<Header> headers = beforeRequestSent.getRequest().getHeaders();
-//            Long headersSize = beforeRequestSent.getRequest().getHeadersSize();
-//
-//            if(url.contains("api/Resource/GetRegions")){
-//                System.out.printf("%nRequest method %s %n. "
-//                                + "Sent to URL %s %n. "
-//                                + "Timing info %s %n. "
-//                                + "Cookies %s %n. "
-//                                + "Headers %s %n. "
-//                                + "Headers size %s %n.",
-//                        method, url, timings.getRequestTime(), cookies, headers, headersSize);
-//            }
-//            network.continueRequest(new ContinueRequestParameters(requestId));
-//
-//            latch.countDown();
-//
-//        });
-
-        // Assuming 'network' is pre-declared and initialized elsewhere
-//        network.onResponseCompleted(responseDetails -> {
-//            // Extract response details
-//            CompletableFuture<ResponseDetails> future = new CompletableFuture<>();
-//            network.onResponseCompleted(future::complete);
-//            driver.get(url+ "/buy/");
-//
-//            ResponseDetails response = null;
-//            try {
-//                response = future.get(5, TimeUnit.SECONDS);
-//            } catch (InterruptedException e) {
-//                throw new RuntimeException(e);
-//            } catch (ExecutionException e) {
-//                throw new RuntimeException(e);
-//            } catch (java.util.concurrent.TimeoutException e) {
-//                throw new RuntimeException(e);
-//            }
-//            String windowHandle = driver.getWindowHandle();
-//            System.out.println("Response Sent +"+ response);
-////
-//
-//            // Continue with the response if needed (or log additional info)
-////            network.continueResponse(new ContinueResponseParameters(requestId));
-//
-//            // Count down the latch if needed
-//            latch.countDown();
-//        });
+        // Listen for network responses
+        devTools.addListener(Network.responseReceived(), response -> {
+            Response res = response.getResponse();
+            if (res.getUrl().contains("api/Resource/GetRegions")) {
+                log.info("Api Found +++++++++++++++");
+                RequestId requestId = response.getRequestId(); // Needed to fetch response body
+                log.info("   Status Code: {}", res.getStatus());
+                try {
+                    Thread.sleep(5000);
+                    Network.GetResponseBodyResponse bodyResponse = devTools.send(Network.getResponseBody(requestId));
+                    String responseBody = bodyResponse.getBody();
 
 
-//        try (Network network1 = new Network(driver)) {
-//            CompletableFuture<ResponseDetails> future = new CompletableFuture<>();
-//            network.onResponseCompleted(future::complete);
-//            driver.get(url+ "/buy/");
-//
-//            ResponseDetails response = future.get(5, TimeUnit.SECONDS);
-//            String windowHandle = driver.getWindowHandle();
-//            System.out.println("Response Sent +"+ response);
-//
-//        } catch (ExecutionException e) {
-//            throw new RuntimeException(e);
-//        } catch (InterruptedException e) {
-//            throw new RuntimeException(e);
-//        } catch (java.util.concurrent.TimeoutException e) {
-//            throw new RuntimeException(e);
-//        }
+                    log.info("Status Code: {}", res.getStatus());
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    RegionsResponseDto apiResponse = objectMapper.readValue(responseBody, RegionsResponseDto.class);
+                    regions.set(apiResponse.getRegions());
+                } catch (Exception e) {
+                    log.error("Error processing API response, reason: {}", e.getMessage());
+                }
+            }
+        });
 
-//someMethod(network);
+        // Visit a website
+        driver.get(url + "/buy/");
+
+        // Wait a few seconds to capture requests
         try {
-//           driver.get(url+ "/buy/");
-
-            boolean countdown = latch.await(5, TimeUnit.SECONDS);
-
-            assert (countdown);
-
-            Thread.sleep(3000);
-        } catch (Exception e) {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        network.close();
+        // Close browser
         driver.quit();
-        return List.of();
+        return regions.get();
     }
-
 
     private List<BusinessListing> extractListingDetails(List<WebElement> listingElements) {
 

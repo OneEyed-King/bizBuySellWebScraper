@@ -1,6 +1,7 @@
 package com.cos.webscraper.service;
 
 import com.cos.webscraper.model.BusinessListing;
+import com.cos.webscraper.model.dto.Regions;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -11,5 +12,5 @@ public interface ScraperSeleniumService {
 
     List<BusinessListing> getWebListings(boolean b);
 
-    List<BusinessListing> getAllRegions(boolean b);
+    List<Regions> getAllRegions(boolean b);
 }
