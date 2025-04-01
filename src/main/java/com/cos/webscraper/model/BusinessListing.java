@@ -16,6 +16,10 @@ public class BusinessListing {
     private String sellerName;
     private String sellerContact;
     private String listingId;
+    private String description;
+    private String financials;
+    private String detailedInfo;
+    private boolean blocked;
 
     public BusinessListing(String name, String listingUrl, String contactButtonId, String listingId) {
     }

@@ -1,8 +1,10 @@
 package com.cos.webscraper.controler;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import com.cos.webscraper.model.BusinessListing;
+import com.cos.webscraper.service.ScraperSeleniumService;
 import com.cos.webscraper.serviceimpl.ScraperSeleniumServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class ScraperSeleniumController {
 
     @Autowired
-    private ScraperSeleniumServiceImpl seleniumService;
+    private ScraperSeleniumService seleniumService;
 
     /**
      * Retrieves seller details.
@@ -23,9 +25,9 @@ public class ScraperSeleniumController {
      *
      */
     @GetMapping("/get-seller-details")
-    public List<BusinessListing> getSelerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+    public CompletableFuture<List<BusinessListing>> getSellerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless, @RequestParam(required = false, defaultValue = "5") String count, @RequestParam(required = false, defaultValue = "0") String skip) throws InterruptedException {
 
-        return seleniumService.scrape(Boolean.parseBoolean(headless));
+        return seleniumService.scrapeAsync(Boolean.parseBoolean(headless), count, skip);
     }
 
     /**
@@ -40,5 +42,11 @@ public class ScraperSeleniumController {
     public List<BusinessListing> getAllListings(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
 
         return seleniumService.getWebListings(Boolean.parseBoolean(headless));
+    }
+
+    @GetMapping("/get-all-regions")
+    public List<BusinessListing> getAllRegions(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+
+        return seleniumService.getAllRegions(Boolean.parseBoolean(headless));
     }
 }

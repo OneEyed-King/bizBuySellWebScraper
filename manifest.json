@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Firefox Proxy Auth Extension",
+  "version": "1.0",
+  "permissions": [
+    "proxy",
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
+
