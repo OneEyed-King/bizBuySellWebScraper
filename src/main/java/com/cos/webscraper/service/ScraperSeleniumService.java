@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface ScraperSeleniumService {
 
-    CompletableFuture<List<BusinessListing>> scrapeAsync(boolean isHeadless, String count, String skip) throws InterruptedException;
+    CompletableFuture<List<BusinessListing>> scrapeAsync(boolean isHeadless, String count, String skip, String region) throws InterruptedException;
 
     List<BusinessListing> getWebListings(boolean b);
 
