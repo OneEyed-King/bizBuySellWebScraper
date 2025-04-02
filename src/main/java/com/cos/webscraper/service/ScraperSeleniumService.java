@@ -15,4 +15,6 @@ public interface ScraperSeleniumService {
     List<Regions> getAllRegions(boolean b);
 
     List<String> getAllIndustries(boolean b);
+
+    CompletableFuture<List<BusinessListing>> getBusinessesByRegionAndIndustry(String region, String industry, boolean headless, String count, String skip);
 }

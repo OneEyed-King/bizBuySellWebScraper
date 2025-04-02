@@ -1,7 +1,9 @@
 package com.cos.webscraper.controler;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import com.cos.webscraper.model.BusinessListing;
 import com.cos.webscraper.model.dto.Regions;
@@ -60,4 +62,14 @@ public class ScraperSeleniumController {
         return seleniumService.getAllIndustries(Boolean.parseBoolean(headless));
 
     }
+
+    @GetMapping("/get-by-region-and-industry")
+    public CompletableFuture<List<BusinessListing>> getByRegionAndIndustry(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless,
+                                                        @RequestParam(required = false, defaultValue = "5") String count,
+                                                        @RequestParam(required = false, defaultValue = "0") String skip,
+                                                        @RequestParam(value = "region", defaultValue = "california")  String region,
+                                                        @RequestParam (value = "industry", defaultValue = "") String industry) throws IOException, InterruptedException, ExecutionException {
+        return seleniumService.getBusinessesByRegionAndIndustry(region, industry, Boolean.parseBoolean(headless), count, skip);
+    }
+
 }
