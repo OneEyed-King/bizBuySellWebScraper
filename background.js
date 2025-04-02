@@ -16,7 +16,7 @@ chrome.webRequest.onAuthRequired.addListener(
   function(details) {
     return {
       authCredentials: {
-        username: "andrew_keensightanalytics_com-country-any-sid-7a3253070d104-filter-medium",
+        username: "andrew_keensightanalytics_com-country-any-sid-bc1edd76d2ef4-filter-medium",
         password: "s8e6jgcgue"
       }
     };
