@@ -53,4 +53,11 @@ public class ScraperSeleniumController {
 
         return seleniumService.getAllRegions(Boolean.parseBoolean(headless));
     }
+
+
+    @GetMapping("/get-all-industries")
+    public List<String> getAllIndustries(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless) throws InterruptedException {
+        return seleniumService.getAllIndustries(Boolean.parseBoolean(headless));
+
+    }
 }
