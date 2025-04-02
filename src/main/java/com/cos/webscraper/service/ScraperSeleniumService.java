@@ -13,4 +13,6 @@ public interface ScraperSeleniumService {
     List<BusinessListing> getWebListings(boolean b);
 
     List<Regions> getAllRegions(boolean b);
+
+    List<String> getAllIndustries(boolean b);
 }

@@ -46,7 +46,8 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private int count;
     private final String url = "https://www.bizbuysell.com/";
-    @Autowired private WebDriverFactory webDriverFactory;
+    @Autowired
+    private WebDriverFactory webDriverFactory;
 
 
     @Override
@@ -66,7 +67,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         List<WebElement> listingElements = new ArrayList<>();
         int count = Integer.parseInt(countStr); // Convert once
         int retry = 0;
-        String targetUrl = region.equals("0") ? url + "/buy/" : "https://www.bizbuysell.com/"+region+"-businesses-for-sale/";
+        String targetUrl = region.equals("0") ? url + "/buy/" : "https://www.bizbuysell.com/" + region + "-businesses-for-sale/";
         try {
 
             while (retry < 8) {
@@ -97,7 +98,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
             for (BusinessListing listing : businessListings) {
 
                 extractSellerDetails(listing, driver, wait, isHeadless);
-                if(listing.isBlocked()){
+                if (listing.isBlocked()) {
                     driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
                     wait = WebDriverFactory.getWait();
                 }
@@ -198,6 +199,56 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         // Close browser
         driver.quit();
         return regions.get();
+    }
+
+    @Override
+    public List<String> getAllIndustries(boolean isHeadless) {
+        WebDriver driver = webDriverFactory.getFireFoxDriver(isHeadless);
+        WebDriverWait wait = WebDriverFactory.getWait();
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(300));
+        List<String> industryList = new ArrayList<>();
+        int retry = 0;
+        Document doc = null;
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+        while (retry < 5) {
+            try {
+                driver.get(url);
+
+                Thread.sleep(3000); // Let elements load
+                wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".bbs-chevron-down")));
+                WebElement popupButton = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".bbs-chevron-down")));
+                js.executeScript("arguments[0].click();", popupButton);
+                // Get updated page source
+                String pageSource = driver.getPageSource();
+
+                // Parse with Jsoup
+                doc = Jsoup.parse(pageSource);
+                if (doc == null) {
+                    throw new NullPointerException();
+                }
+
+            } catch (Exception e) {
+                log.warn("retrying... count: {}", retry);
+                driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
+                wait = WebDriverFactory.getWait();
+                retry++;
+            }
+
+            if (retry >= 5) {
+                log.error(" Max retries done returning");
+                throw new TimeoutException();
+            }
+            Elements industries = doc.select("li.industry-dropdown-options");
+            // Extract and print industry names
+            for (Element industry : industries) {
+                if (!industry.hasAttr("hidden")) {
+                    industryList.add(industry.text());
+                }
+            }
+
+
+        }
+        return industryList;
     }
 
     private List<BusinessListing> extractListingDetails(List<WebElement> listingElements) {
