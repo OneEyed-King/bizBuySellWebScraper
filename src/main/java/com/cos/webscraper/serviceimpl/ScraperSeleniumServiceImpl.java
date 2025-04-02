@@ -45,7 +45,9 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private int count;
-    private final String url = "https://www.bizbuysell.com/";
+    private final String URL = "https://www.bizbuysell.com";
+    private final String SEPERATOR = "/";
+    private final String BUY = "/buy/";
     @Autowired
     private WebDriverFactory webDriverFactory;
 
@@ -53,12 +55,13 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
     @Override
     @Async("asyncExecutor")  // Runs in a separate thread pool
     public CompletableFuture<List<BusinessListing>> scrapeAsync(boolean headless, String count, String skip, String region) {
-        List<BusinessListing> listings = scrape(headless, count, skip, region); // Your scraping logic
+        String targetUrl = region.equals("0") ? URL + "/buy/" : "https://www.bizbuysell.com/" + region + "-businesses-for-sale/";
+        List<BusinessListing> listings = scrape(headless, count, skip, targetUrl); // Your scraping logic
         return CompletableFuture.completedFuture(listings);
     }
 
 
-    public List<BusinessListing> scrape(boolean isHeadless, String countStr, String skip, String region) {
+    public List<BusinessListing> scrape(boolean isHeadless, String countStr, String skip, String targetUrl) {
         WebDriver driver = webDriverFactory.getFireFoxDriver(isHeadless);
 //        WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
@@ -67,7 +70,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         List<WebElement> listingElements = new ArrayList<>();
         int count = Integer.parseInt(countStr); // Convert once
         int retry = 0;
-        String targetUrl = region.equals("0") ? url + "/buy/" : "https://www.bizbuysell.com/" + region + "-businesses-for-sale/";
+//        String targetUrl = region.equals("0") ? url + "/buy/" : "https://www.bizbuysell.com/" + region + "-businesses-for-sale/";
         try {
 
             while (retry < 8) {
@@ -127,7 +130,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         List<BusinessListing> businessListings = new ArrayList<>();
 
         try {
-            driver.get(url + "/buy/");
+            driver.get(URL + "/buy/");
             JavascriptExecutor js = (JavascriptExecutor) driver;
             js.executeScript("window.scrollTo(0, document.body.scrollHeight);");
             Thread.sleep(2000); // Wait for content to load
@@ -187,7 +190,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         });
 
         // Visit a website
-        driver.get(url + "/buy/");
+        driver.get(URL + "/buy/");
 
         // Wait a few seconds to capture requests
         try {
@@ -212,7 +215,7 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         JavascriptExecutor js = (JavascriptExecutor) driver;
         while (retry < 5) {
             try {
-                driver.get(url);
+                driver.get(URL);
 
                 Thread.sleep(3000); // Let elements load
                 wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".bbs-chevron-down")));
@@ -226,7 +229,6 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
                 if (doc == null) {
                     throw new NullPointerException();
                 }
-
             } catch (Exception e) {
                 log.warn("retrying... count: {}", retry);
                 driver = rotateProxy(isHeadless);  // Rotate proxy and user agent
@@ -245,10 +247,88 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
                     industryList.add(industry.text());
                 }
             }
-
+            break;
 
         }
         return industryList;
+    }
+
+    @Override
+    public CompletableFuture<List<BusinessListing>> getBusinessesByRegionAndIndustry(String region, String industry, boolean headless, String count, String skip) {
+        StringBuilder targetUrl = new StringBuilder();
+//        https://www.bizbuysell.com/california/automotive-and-boat-businesses-for-sale/
+//        String industryString = null
+        targetUrl.append(URL)
+                .append(SEPERATOR)
+                .append(region)
+                .append(SEPERATOR)
+                .append(industry.equals("") ? "" : (getIndustryCategory(industry) + "-businesses-for-sale/"));
+        List<BusinessListing> listings = scrape(headless, count, skip, targetUrl.toString()); // Your scraping logic
+        return CompletableFuture.completedFuture(listings);
+    }
+
+    public static String getIndustryCategory(String userInput) {
+        if (userInput == null) return "Invalid input";
+
+        switch (userInput.toLowerCase()) {
+            case "all industries":
+                return "all-industries";
+            case "agriculture":
+                return "agriculture";
+            case "automotive":
+            case "boat":
+                return "automotive-and-boat";
+            case "beauty":
+            case "personal care":
+                return "beauty-and-personal-care";
+            case "building":
+            case "construction":
+                return "building-and-construction";
+            case "communication":
+            case "media":
+                return "communication-and-media";
+            case "education":
+            case "children":
+                return "education-and-children-related";
+            case "entertainment":
+            case "recreation":
+                return "entertainment-and-recreation";
+            case "financial":
+            case "finance":
+                return "financial-services";
+            case "health":
+            case "fitness":
+            case "health care":
+                return "health-care-and-fitness";
+            case "manufacturing":
+                return "manufacturing";
+//            case "non-classifiable":
+//                return "non-classifiable-establishments";
+            case "online":
+            case "technology":
+                return "online-and-technology";
+            case "pet":
+            case "pet services":
+                return "pet-and-services";
+            case "restaurants":
+            case "food":
+                return "restaurants-and-food";
+            case "retail":
+                return "retail";
+            case "service":
+            case "services":
+                return "service-businesses";
+            case "transportation":
+            case "storage":
+                return "transportation-and-storage";
+            case "travel":
+                return "travel";
+            case "wholesale":
+            case "distributors":
+                return "wholesale-and-distribution";
+            default:
+                return "Unknown category";
+        }
     }
 
     private List<BusinessListing> extractListingDetails(List<WebElement> listingElements) {
