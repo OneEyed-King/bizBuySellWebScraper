@@ -25,9 +25,13 @@ public class ScraperSeleniumController {
      *
      */
     @GetMapping("/get-seller-details")
-    public CompletableFuture<List<BusinessListing>> getSellerDetails(@RequestHeader(value = "headless", required = false, defaultValue = "false") String headless, @RequestParam(required = false, defaultValue = "5") String count, @RequestParam(required = false, defaultValue = "0") String skip) throws InterruptedException {
+    public CompletableFuture<List<BusinessListing>> getSellerDetails(
+            @RequestHeader(value = "headless", required = false, defaultValue = "false") String headless,
+            @RequestParam(required = false, defaultValue = "5") String count,
+            @RequestParam(required = false, defaultValue = "0") String skip,
+            @RequestParam(required = false, defaultValue = "0") String region) throws InterruptedException {
 
-        return seleniumService.scrapeAsync(Boolean.parseBoolean(headless), count, skip);
+        return seleniumService.scrapeAsync(Boolean.parseBoolean(headless), count, skip, region);
     }
 
     /**

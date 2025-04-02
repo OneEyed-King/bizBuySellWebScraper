@@ -4,7 +4,6 @@ import com.cos.webscraper.config.WebDriverFactory;
 import com.cos.webscraper.model.dto.Regions;
 import com.cos.webscraper.model.dto.RegionsResponseDto;
 import com.cos.webscraper.service.ScraperSeleniumService;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -52,13 +51,13 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
 
     @Override
     @Async("asyncExecutor")  // Runs in a separate thread pool
-    public CompletableFuture<List<BusinessListing>> scrapeAsync(boolean headless, String count, String skip) {
-        List<BusinessListing> listings = scrape(headless, count, skip); // Your scraping logic
+    public CompletableFuture<List<BusinessListing>> scrapeAsync(boolean headless, String count, String skip, String region) {
+        List<BusinessListing> listings = scrape(headless, count, skip, region); // Your scraping logic
         return CompletableFuture.completedFuture(listings);
     }
 
 
-    public List<BusinessListing> scrape(boolean isHeadless, String countStr, String skip) {
+    public List<BusinessListing> scrape(boolean isHeadless, String countStr, String skip, String region) {
         WebDriver driver = webDriverFactory.getFireFoxDriver(isHeadless);
 //        WebDriver driver = webDriverFactory.getChromeDriver(isHeadless);
         WebDriverWait wait = WebDriverFactory.getWait();
@@ -67,11 +66,12 @@ public class ScraperSeleniumServiceImpl implements ScraperSeleniumService {
         List<WebElement> listingElements = new ArrayList<>();
         int count = Integer.parseInt(countStr); // Convert once
         int retry = 0;
+        String targetUrl = region.equals("0") ? url + "/buy/" : "https://www.bizbuysell.com/"+region+"-businesses-for-sale/";
         try {
 
             while (retry < 8) {
                 try {
-                    driver.get(url + "/buy/");
+                    driver.get(targetUrl);
 //                    driver.get("https://myexternalip.com/raw");
                     JavascriptExecutor js = (JavascriptExecutor) driver;
                     Thread.sleep(3000); // Let elements load
